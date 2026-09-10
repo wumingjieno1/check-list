@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "检查清单",
+    "slug": "check-list",
+    "scheme": "checklist",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true },
+    "android": { "package": "com.local.checklist" },
+    "plugins": ["expo-router"]
+  }
+}

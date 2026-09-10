@@ -5,3 +5,22 @@ dist/
 web-build/
 *.log
 .DS_Store
+
+# Expo
+expo-env.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Native
+/ios
+/android
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+
+# macOS / secrets
+*.pem
