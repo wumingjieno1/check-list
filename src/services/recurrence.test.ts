@@ -50,4 +50,11 @@ describe('buildSchedule', () => {
     ]);
     expect(buildSchedule(rule, '2026-09-10', '2026-09-12')).not.toContain('2026-09-11');
   });
+  it('同一天 exclude+include 反序时 exclude 仍优先', () => {
+    const rule = mk('daily', [], [
+      { date: '2026-09-11', type: 'exclude' },
+      { date: '2026-09-11', type: 'include' },
+    ]);
+    expect(buildSchedule(rule, '2026-09-10', '2026-09-12')).not.toContain('2026-09-11');
+  });
 });

@@ -14,9 +14,9 @@ export interface RuleInput {
 }
 
 export function isScheduled(date: string, rule: RuleInput, startDate: string): boolean {
-  const exception = new Map(rule.exceptions.map((e) => [e.date, e.type])).get(date);
-  if (exception === 'exclude') return false;
-  if (exception === 'include' && rule.recurrence !== 'none') return true;
+  const exceptions = rule.exceptions;
+  if (exceptions.some((e) => e.date === date && e.type === 'exclude')) return false;
+  if (exceptions.some((e) => e.date === date && e.type === 'include') && rule.recurrence !== 'none') return true;
 
   const day = fromDateStr(date);
   switch (rule.recurrence) {
