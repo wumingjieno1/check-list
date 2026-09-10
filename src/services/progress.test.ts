@@ -31,6 +31,20 @@ describe('groupByGroup', () => {
   });
 });
 
+describe('groupByGroup 乱序输入', () => {
+  it('组按 groupSortOrder、组内按 sortOrder 排序', () => {
+    const shuffled: FlatItem[] = [
+      { occurrenceItemId: 'c', groupTitle: 'G2', groupSortOrder: 1, itemTitle: 'z', sortOrder: 0, done: 0 },
+      { occurrenceItemId: 'b2', groupTitle: 'G1', groupSortOrder: 0, itemTitle: 'y2', sortOrder: 1, done: 0 },
+      { occurrenceItemId: 'a1', groupTitle: 'G1', groupSortOrder: 0, itemTitle: 'x1', sortOrder: 0, done: 1 },
+    ];
+    const gs = groupByGroup(shuffled);
+    expect(gs.map((g) => g.title)).toEqual(['G1', 'G2']);
+    expect(gs[0].items.map((i) => i.occurrenceItemId)).toEqual(['a1', 'b2']);
+    expect(gs[1].items.map((i) => i.occurrenceItemId)).toEqual(['c']);
+  });
+});
+
 describe('dayStatus', () => {
   it('全完成 done / 部分 partial / 全未 missed / 空 none', () => {
     expect(dayStatus([{ status: 'done' }, { status: 'done' }])).toBe('done');

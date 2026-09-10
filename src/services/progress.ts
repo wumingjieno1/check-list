@@ -40,7 +40,9 @@ export function groupByGroup(items: FlatItem[]): GroupView[] {
     g.total += 1;
     if (it.done === 1) g.done += 1;
   }
-  return [...map.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+  return [...map.values()]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((g) => ({ ...g, items: [...g.items].sort((a, b) => a.sortOrder - b.sortOrder) }));
 }
 
 export type DayStatusValue = 'done' | 'partial' | 'missed' | 'none';
