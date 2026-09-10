@@ -18,7 +18,7 @@ function isEmptyTemplate(repo: Repo, checklistId: string): boolean {
 export function ensureWindow(repo: Repo, today: string, daysAhead: number, now: number): number {
   let created = 0;
   for (const c of repo.checklists.listActive()) {
-    if (isEmptyTemplate(repo, c.id)) continue;
+    if (c.recurrence === 'none' || isEmptyTemplate(repo, c.id)) continue;
     for (const dueDate of scheduleFor(repo, c.id, c.recurrence, c.weekdays, today, daysAhead)) {
       if (repo.occurrences.exists(c.id, dueDate)) continue;
       repo.occurrences.createWithItems(
@@ -34,7 +34,7 @@ export function ensureWindow(repo: Repo, today: string, daysAhead: number, now: 
 export function rebuildFutureForChecklist(repo: Repo, checklistId: string, today: string, daysAhead: number, now: number) {
   repo.occurrences.deleteFutureUntouched(checklistId, today);
   const c = repo.checklists.get(checklistId);
-  if (!c || c.isArchived || isEmptyTemplate(repo, checklistId)) return;
+  if (!c || c.isArchived || c.recurrence === 'none' || isEmptyTemplate(repo, checklistId)) return;
   for (const dueDate of scheduleFor(repo, checklistId, c.recurrence, c.weekdays, today, daysAhead)) {
     if (repo.occurrences.exists(checklistId, dueDate)) continue;
     repo.occurrences.createWithItems(

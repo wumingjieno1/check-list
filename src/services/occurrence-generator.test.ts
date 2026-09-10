@@ -58,6 +58,16 @@ describe('ensureWindow', () => {
     ensureWindow(repo, '2026-09-10', 2, 100);
     expect(repo.occurrences.listInRange('2026-09-10', '2026-09-12')).toHaveLength(0);
   });
+
+  it('none 一次性检查单不参与每日懒生成', () => {
+    repo.checklists.create({ id: 'c2', title: '一次性', icon: 'star', color: 'blue', recurrence: 'none', weekdays: [], sortOrder: 1, createdAt: 2 });
+    repo.groups.create({ id: 'g2', checklistId: 'c2', title: 'G', sortOrder: 0 });
+    repo.items.create({ id: 'i2', groupId: 'g2', title: 'X', sortOrder: 0 });
+    ensureWindow(repo, '2026-09-10', 2, 100);
+    expect(repo.occurrences.listInRange('2026-09-10', '2026-09-11').filter((o) => o.checklistId === 'c2')).toHaveLength(0);
+    ensureWindow(repo, '2026-09-11', 2, 101);
+    expect(repo.occurrences.listInRange('2026-09-10', '2026-09-11').filter((o) => o.checklistId === 'c2')).toHaveLength(0);
+  });
 });
 
 describe('rebuildFutureForChecklist', () => {
@@ -74,5 +84,15 @@ describe('rebuildFutureForChecklist', () => {
     expect(dates).toContain('2026-09-11');
     expect(dates).not.toContain('2026-09-12');
     expect(dates).not.toContain('2026-09-13');
+  });
+
+  it('none 一次性检查单重建不伪造今日实例', () => {
+    repo.checklists.update('c1', { recurrence: 'none' });
+    repo.occurrences.createWithItems(
+      'occ:c1:2026-09-10', 'c1', '2026-09-10', repo.checklists.getStructure('c1'), 100,
+    );
+    rebuildFutureForChecklist(repo, 'c1', '2026-09-11', 2, 200);
+    expect(repo.occurrences.listInRange('2026-09-10', '2026-09-13').map((o) => o.dueDate))
+      .toEqual(['2026-09-10']);
   });
 });
