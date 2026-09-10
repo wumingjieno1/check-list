@@ -105,7 +105,11 @@ export default function CalendarScreen() {
             onNext={() => shiftMonth(1)}
           />
           <View style={styles.legend}>
-            <Text style={styles.legendText}>● 全部完成　● 部分　● 未完成　! 例外（长按日期设置）</Text>
+            <Text style={styles.legendText}>
+              <Text style={{ color: palette.green }}>●</Text> 全部完成　
+              <Text style={{ color: palette.orange }}>●</Text> 部分　
+              <Text style={{ color: palette.gray }}>●</Text> 未完成　! 例外（长按日期设置）
+            </Text>
           </View>
           <Text style={styles.dayTitle}>{formatCN(selected)}</Text>
         </View>
