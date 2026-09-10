@@ -38,9 +38,23 @@ describe('checklists', () => {
     newChecklist('c1');
     repo.groups.create({ id: 'g1', checklistId: 'c1', title: 'G', sortOrder: 0 });
     repo.items.create({ id: 'i1', groupId: 'g1', title: 'X', sortOrder: 0 });
+    repo.occurrences.createWithItems('o1', 'c1', '2026-09-10', repo.checklists.getStructure('c1'), 100);
+    const oi = repo.occurrences.getFlatItems('o1')[0].id;
+    expect(repo.results.toggle(oi, 200)).toBe(true);
+    repo.exceptions.set('e1', 'c1', '2026-10-01', 'exclude', 1);
     repo.checklists.delete('c1');
     expect(repo.checklists.get('c1')).toBeNull();
     expect(repo.checklists.getStructure('c1').groups).toEqual([]);
+    expect(repo.occurrences.listInRange('2000-01-01', '2100-01-01')).toEqual([]);
+    expect(repo.exceptions.listForChecklist('c1')).toEqual([]);
+    newChecklist('c1');
+    repo.groups.create({ id: 'g1', checklistId: 'c1', title: 'G', sortOrder: 0 });
+    repo.items.create({ id: 'i1', groupId: 'g1', title: 'X', sortOrder: 0 });
+    expect(repo.exceptions.listForChecklist('c1')).toEqual([]);
+    repo.occurrences.createWithItems('o1', 'c1', '2026-09-10', repo.checklists.getStructure('c1'), 100);
+    const fresh = repo.occurrences.getFlatItems('o1');
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0]).toMatchObject({ id: oi, done: 0, toggledAt: null });
   });
   it('getStructure 组/项按排序返回', () => {
     newChecklist('c1');

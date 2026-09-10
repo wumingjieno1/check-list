@@ -14,6 +14,7 @@ type AnyDb = {
   insert(...args: any[]): any;
   update(...args: any[]): any;
   delete(...args: any[]): any;
+  transaction<T>(fn: () => T): T;
 };
 
 const mapChecklist = (r: typeof checklists.$inferSelect): ChecklistDTO => ({
@@ -65,18 +66,20 @@ export function createRepositories(db: AnyDb) {
         db.update(checklists).set({ isArchived: archived ? 1 : 0 }).where(eq(checklists.id, id)).run();
       },
       delete(id: string) {
-        const gs = db.select().from(groups).where(eq(groups.checklistId, id)).all();
-        for (const g of gs) db.delete(items).where(eq(items.groupId, g.id)).run();
-        db.delete(groups).where(eq(groups.checklistId, id)).run();
-        const occs = db.select().from(occurrences).where(eq(occurrences.checklistId, id)).all();
-        for (const o of occs) {
-          db.delete(itemResults).where(sql`occurrence_item_id IN (
-            SELECT id FROM occurrence_items WHERE occurrence_id = ${o.id})`).run();
-          db.delete(occurrenceItems).where(eq(occurrenceItems.occurrenceId, o.id)).run();
-        }
-        db.delete(occurrences).where(eq(occurrences.checklistId, id)).run();
-        db.delete(dateExceptions).where(eq(dateExceptions.checklistId, id)).run();
-        db.delete(checklists).where(eq(checklists.id, id)).run();
+        db.transaction(() => {
+          const gs = db.select().from(groups).where(eq(groups.checklistId, id)).all();
+          for (const g of gs) db.delete(items).where(eq(items.groupId, g.id)).run();
+          db.delete(groups).where(eq(groups.checklistId, id)).run();
+          const occs = db.select().from(occurrences).where(eq(occurrences.checklistId, id)).all();
+          for (const o of occs) {
+            db.delete(itemResults).where(sql`occurrence_item_id IN (
+              SELECT id FROM occurrence_items WHERE occurrence_id = ${o.id})`).run();
+            db.delete(occurrenceItems).where(eq(occurrenceItems.occurrenceId, o.id)).run();
+          }
+          db.delete(occurrences).where(eq(occurrences.checklistId, id)).run();
+          db.delete(dateExceptions).where(eq(dateExceptions.checklistId, id)).run();
+          db.delete(checklists).where(eq(checklists.id, id)).run();
+        });
       },
       getStructure(id: string): TemplateStructure {
         const gs = db.select().from(groups).where(eq(groups.checklistId, id))
@@ -100,8 +103,10 @@ export function createRepositories(db: AnyDb) {
         db.update(groups).set(patch).where(eq(groups.id, id)).run();
       },
       delete(id: string) {
-        db.delete(items).where(eq(items.groupId, id)).run();
-        db.delete(groups).where(eq(groups.id, id)).run();
+        db.transaction(() => {
+          db.delete(items).where(eq(items.groupId, id)).run();
+          db.delete(groups).where(eq(groups.id, id)).run();
+        });
       },
     },
 
@@ -115,18 +120,20 @@ export function createRepositories(db: AnyDb) {
 
     occurrences: {
       createWithItems(id: string, checklistId: string, dueDate: string, structure: TemplateStructure, now: number): OccurrenceDTO {
-        db.insert(occurrences).values({
-          id, checklistId, dueDate, status: 'active', completedAt: null, createdAt: now,
-        }).run();
-        const rows = buildSnapshots(id, structure);
-        if (rows.length > 0) {
-          db.insert(occurrenceItems).values(rows.map((r) => ({
-            id: `${r.occurrenceId}:${r.sourceItemId}`,
-            occurrenceId: r.occurrenceId, sourceItemId: r.sourceItemId,
-            groupTitle: r.groupTitle, groupSortOrder: r.groupSortOrder,
-            itemTitle: r.itemTitle, sortOrder: r.sortOrder,
-          }))).run();
-        }
+        db.transaction(() => {
+          db.insert(occurrences).values({
+            id, checklistId, dueDate, status: 'active', completedAt: null, createdAt: now,
+          }).run();
+          const rows = buildSnapshots(id, structure);
+          if (rows.length > 0) {
+            db.insert(occurrenceItems).values(rows.map((r) => ({
+              id: `${r.occurrenceId}:${r.sourceItemId}`,
+              occurrenceId: r.occurrenceId, sourceItemId: r.sourceItemId,
+              groupTitle: r.groupTitle, groupSortOrder: r.groupSortOrder,
+              itemTitle: r.itemTitle, sortOrder: r.sortOrder,
+            }))).run();
+          }
+        });
         return { id, checklistId, dueDate, status: 'active', completedAt: null, createdAt: now };
       },
       exists(checklistId: string, dueDate: string): boolean {
@@ -160,18 +167,20 @@ export function createRepositories(db: AnyDb) {
           .orderBy(asc(occurrences.dueDate)).all();
       },
       deleteFutureUntouched(checklistId: string, fromDate: string) {
-        const candidates = db.select().from(occurrences).where(
-          and(eq(occurrences.checklistId, checklistId), gte(occurrences.dueDate, fromDate))).all();
-        for (const o of candidates) {
-          const touched = db.select().from(occurrenceItems)
-            .innerJoin(itemResults, sql`${itemResults.occurrenceItemId} = ${occurrenceItems.id} AND ${itemResults.done} = 1`)
-            .where(eq(occurrenceItems.occurrenceId, o.id)).get();
-          if (touched) continue;
-          db.delete(itemResults).where(sql`occurrence_item_id IN (
-            SELECT id FROM occurrence_items WHERE occurrence_id = ${o.id})`).run();
-          db.delete(occurrenceItems).where(eq(occurrenceItems.occurrenceId, o.id)).run();
-          db.delete(occurrences).where(eq(occurrences.id, o.id)).run();
-        }
+        db.transaction(() => {
+          const candidates = db.select().from(occurrences).where(
+            and(eq(occurrences.checklistId, checklistId), gte(occurrences.dueDate, fromDate))).all();
+          for (const o of candidates) {
+            const touched = db.select().from(occurrenceItems)
+              .innerJoin(itemResults, sql`${itemResults.occurrenceItemId} = ${occurrenceItems.id} AND ${itemResults.done} = 1`)
+              .where(eq(occurrenceItems.occurrenceId, o.id)).get();
+            if (touched) continue;
+            db.delete(itemResults).where(sql`occurrence_item_id IN (
+              SELECT id FROM occurrence_items WHERE occurrence_id = ${o.id})`).run();
+            db.delete(occurrenceItems).where(eq(occurrenceItems.occurrenceId, o.id)).run();
+            db.delete(occurrences).where(eq(occurrences.id, o.id)).run();
+          }
+        });
       },
       getFlatItems(occurrenceId: string): OccurrenceItemDTO[] {
         return db.select({
@@ -183,7 +192,8 @@ export function createRepositories(db: AnyDb) {
           toggledAt: itemResults.toggledAt,
         }).from(occurrenceItems)
           .leftJoin(itemResults, eq(occurrenceItems.id, itemResults.occurrenceItemId))
-          .where(eq(occurrenceItems.occurrenceId, occurrenceId)).all()
+          .where(eq(occurrenceItems.occurrenceId, occurrenceId))
+          .orderBy(asc(occurrenceItems.groupSortOrder), asc(occurrenceItems.sortOrder)).all()
           .map((r: any): OccurrenceItemDTO => ({
             id: r.id, occurrenceItemId: r.id, occurrenceId: r.occurrenceId,
             sourceItemId: r.sourceItemId, groupTitle: r.groupTitle,
