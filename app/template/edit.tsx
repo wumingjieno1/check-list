@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, Keyboard, KeyboardAvoidingView, Platform,
-  TouchableOpacity, UIManager, findNodeHandle,
+  TouchableOpacity,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,53 +26,55 @@ export default function TemplateEditScreen() {
   const actions = useMemo(() => createAppActions(repo), []);
 
   const scrollRef = useRef<any>(null);
-  const focusedNode = useRef<any>(null);
+  const contentRef = useRef<any>(null);
+  const focusedInput = useRef<any>(null);
   const keyboardY = useRef<number | null>(null);
 
   const scrollFocusedAboveKeyboard = useCallback(() => {
     if (Platform.OS !== 'android') return;
-    const inputHost = focusedNode.current;
-    const scroll = scrollRef.current;
-    const scrollHost = scroll?.getNativeScrollRef?.() ?? scroll;
-    if (inputHost == null || scrollHost == null) return;
+    const input = focusedInput.current;
+    const scroll = scrollRef.current?.getNativeScrollRef?.() ?? scrollRef.current;
+    const content = contentRef.current;
+    if (!input || !scroll || !content) return;
 
-    inputHost.measureInWindow((_ix: number, iy: number, _iw: number, ih: number) => {
-      scrollHost.measureInWindow((_sx: number, sy: number, _sw: number, sh: number) => {
-        UIManager.measureLayout(
-          inputHost,
-          scrollHost,
-          () => {},
-          (_x: number, contentY: number) => {
-            const currentOffset = contentY - (iy - sy);
-            const margin = 24;
-            const kbY = keyboardY.current ?? sy + sh;
-            let target: number | null = null;
-            if (iy + ih > kbY - margin) {
-              target = currentOffset + (iy + ih - kbY + margin);
-            } else if (iy < sy + 8) {
-              target = currentOffset - (sy + 8 - iy);
-            }
-            if (target != null) scroll.scrollTo({ y: Math.max(0, target), animated: true });
-          },
-        );
+    input.measureInWindow((_ix: number, iy: number, _iw: number, ih: number) => {
+      scroll.measureInWindow((_sx: number, sy: number, _sw: number, sh: number) => {
+        content.measureInWindow((_cx: number, cy: number) => {
+          const currentOffset = cy - sy;
+          const margin = 16;
+          const kbY = keyboardY.current ?? sy + sh;
+          let target: number | null = null;
+          if (iy + ih > kbY - margin) {
+            target = currentOffset + (iy + ih - kbY + margin);
+          } else if (iy < sy + margin) {
+            target = currentOffset - (sy + margin - iy);
+          }
+          if (target != null) {
+            scrollRef.current.scrollTo({ y: Math.max(0, target), animated: true });
+          }
+        });
       });
     });
   }, []);
 
   const onInputFocus = useCallback((e: any) => {
     if (Platform.OS !== 'android') return;
-    focusedNode.current = findNodeHandle(e.currentTarget as any);
-    setTimeout(scrollFocusedAboveKeyboard, 60);
-    setTimeout(scrollFocusedAboveKeyboard, 260);
+    focusedInput.current = e.currentTarget;
+    setTimeout(scrollFocusedAboveKeyboard, 30);
+    setTimeout(scrollFocusedAboveKeyboard, 120);
+    setTimeout(scrollFocusedAboveKeyboard, 300);
   }, [scrollFocusedAboveKeyboard]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    const sub = Keyboard.addListener('keyboardDidShow', (ev) => {
+    const show = Keyboard.addListener('keyboardDidShow', (ev) => {
       keyboardY.current = ev.endCoordinates.screenY;
       scrollFocusedAboveKeyboard();
     });
-    return () => sub.remove();
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardY.current = null;
+    });
+    return () => { show.remove(); hide.remove(); };
   }, [scrollFocusedAboveKeyboard]);
 
   const [title, setTitle] = useState(editing?.title ?? '');
@@ -178,10 +180,10 @@ export default function TemplateEditScreen() {
       }} />
       <NestableScrollContainer
         ref={scrollRef}
-        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
+        <View ref={contentRef} style={styles.formContent}>
         <TextInput
           style={styles.input}
           placeholder="检查单名称"
@@ -232,7 +234,7 @@ export default function TemplateEditScreen() {
               renderItem={({ item, drag }) => (
                 <ScaleDecorator>
                   <TouchableOpacity onLongPress={drag} activeOpacity={0.7} style={styles.itemRow}>
-                    <Ionicons name="reorder-two-outline" size={18} color={palette.gray} />
+                    <Ionicons name="reorder-three-outline" size={22} color={palette.gray} />
                     <TextInput
                       style={styles.itemInput}
                       placeholder="检查项"
@@ -262,12 +264,14 @@ export default function TemplateEditScreen() {
         <Pressable onPress={confirmDelete} style={styles.deleteBtn}>
           <Text style={styles.deleteText}>{editing ? '删除检查单' : '取消'}</Text>
         </Pressable>
+        </View>
       </NestableScrollContainer>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  formContent: { padding: 16, paddingBottom: 64 },
   input: { backgroundColor: palette.white, borderRadius: 10, borderWidth: 1, borderColor: palette.border,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: palette.text },
   row: { flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' },
