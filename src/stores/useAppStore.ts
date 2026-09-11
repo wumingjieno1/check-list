@@ -115,6 +115,18 @@ export function createAppActions(r: Repo, getToday: () => string = todayStr) {
       return id;
     },
 
+    updateMeta(checklistId: string, patch: { title: string; icon: string; color: string }) {
+      r.checklists.update(checklistId, patch);
+    },
+
+    deleteChecklist(checklistId: string) {
+      r.checklists.delete(checklistId);
+    },
+
+    archiveChecklist(checklistId: string, archived: boolean) {
+      r.checklists.archive(checklistId, archived);
+    },
+
     updateRecurrence(checklistId: string, patch: { recurrence: RecurrenceType; weekdays: number[] }) {
       r.checklists.update(checklistId, patch);
       rebuildFutureForChecklist(r, checklistId, getToday(), WINDOW_DAYS, Date.now());
