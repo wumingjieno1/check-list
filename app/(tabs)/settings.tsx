@@ -19,7 +19,12 @@ export default function SettingsScreen() {
         encoding: FileSystem.EncodingType.UTF8,
       });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: '导出检查清单数据' });
+        try {
+          await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: '导出检查清单数据' });
+        } catch (e) {
+          const code = (e as { code?: string })?.code ?? '';
+          if (!code.includes('CANCEL')) throw e;
+        }
       } else {
         Alert.alert('已导出', `文件已保存：${uri}`);
       }

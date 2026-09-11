@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,6 +8,7 @@ import { palette } from '@/theme/colors';
 
 export default function RootLayout() {
   const hydrate = useAppStore((s) => s.hydrate);
+  const loadToday = useAppStore((s) => s.loadToday);
   const hydrated = useAppStore((s) => s.hydrated);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,6 +19,16 @@ export default function RootLayout() {
       setError(e instanceof Error ? e.message : String(e));
     }
   }, [hydrate]);
+
+  useEffect(() => {
+    const onActive = (state: AppStateStatus) => {
+      if (state === 'active') {
+        try { loadToday(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+      }
+    };
+    const sub = AppState.addEventListener('change', onActive);
+    return () => sub.remove();
+  }, [loadToday, hydrated]);
 
   if (error) {
     return (

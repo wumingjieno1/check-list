@@ -150,7 +150,11 @@ export function createRepositories(db: AnyDb) {
           .where(eq(occurrences.id, id)).get();
         return r ? { ...r, status: r.status as 'active' | 'done' } : null;
       },
-      listByDate(dueDate: string) {
+      listByDate(dueDate: string): {
+        id: string; checklistId: string; dueDate: string; status: 'active' | 'done';
+        completedAt: number | null; createdAt: number;
+        checklistTitle: string; icon: string; color: string;
+      }[] {
         return db.select({
           id: occurrences.id, checklistId: occurrences.checklistId, dueDate: occurrences.dueDate,
           status: occurrences.status, completedAt: occurrences.completedAt, createdAt: occurrences.createdAt,

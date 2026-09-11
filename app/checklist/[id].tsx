@@ -22,7 +22,7 @@ export default function ChecklistScreen() {
   const flat = useMemo(() => (id ? repo.occurrences.getFlatItems(id) : []), [id, version]);
   const groups = useMemo(() => groupByGroup(flat), [flat]);
   const progress = occurrenceProgress(flat);
-  const readOnly = occ ? occ.dueDate < todayStr() : false;
+  const readOnly = occ ? occ.dueDate !== todayStr() : false;
   const color = checklistColors[occ?.color ?? 'green'] ?? palette.green;
   const justFinished = progress.isDone;
 

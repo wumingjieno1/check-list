@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
   TouchableOpacity,
@@ -38,24 +38,26 @@ export default function TemplateEditScreen() {
     }));
   });
 
-  const updateGroup = (localId: string, patch: Partial<LocalGroup>) =>
-    setGroups((gs) => gs.map((g) => (g.localId === localId ? { ...g, ...patch } : g)));
+  const updateGroup = useCallback((localId: string, patch: Partial<LocalGroup>) =>
+    setGroups((gs) => gs.map((g) => (g.localId === localId ? { ...g, ...patch } : g))), []);
 
-  const addItem = (groupLocalId: string) =>
-    updateGroup(groupLocalId, {
-      items: [...groups.find((g) => g.localId === groupLocalId)!.items, { localId: uuid(), title: '' }],
-    });
+  const addItem = useCallback((groupLocalId: string) =>
+    setGroups((gs) => gs.map((g) =>
+      g.localId === groupLocalId
+        ? { ...g, items: [...g.items, { localId: uuid(), title: '' }] }
+        : g)), []);
 
-  const updateItem = (groupLocalId: string, itemLocalId: string, title: string) =>
-    updateGroup(groupLocalId, {
-      items: groups.find((g) => g.localId === groupLocalId)!.items
-        .map((it) => (it.localId === itemLocalId ? { ...it, title } : it)),
-    });
+  const updateItem = useCallback((groupLocalId: string, itemLocalId: string, title: string) =>
+    setGroups((gs) => gs.map((g) =>
+      g.localId === groupLocalId
+        ? { ...g, items: g.items.map((it) => (it.localId === itemLocalId ? { ...it, title } : it)) }
+        : g)), []);
 
-  const removeItem = (groupLocalId: string, itemLocalId: string) =>
-    updateGroup(groupLocalId, {
-      items: groups.find((g) => g.localId === groupLocalId)!.items.filter((it) => it.localId !== itemLocalId),
-    });
+  const removeItem = useCallback((groupLocalId: string, itemLocalId: string) =>
+    setGroups((gs) => gs.map((g) =>
+      g.localId === groupLocalId
+        ? { ...g, items: g.items.filter((it) => it.localId !== itemLocalId) }
+        : g)), []);
 
   const moveGroup = (index: number, delta: number) => {
     const next = [...groups];
@@ -64,8 +66,25 @@ export default function TemplateEditScreen() {
     setGroups(next);
   };
 
+  const confirmDeleteGroup = (localId: string, title: string) => {
+    Alert.alert('删除该分组？', `「${title}」及其检查项将被移除。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除', style: 'destructive',
+        onPress: () => setGroups((gs) => (
+          gs.length <= 1
+            ? [{ localId: gs[0].localId, title: '分组 1', items: [] }]
+            : gs.filter((x) => x.localId !== localId)
+        )),
+      },
+    ]);
+  };
+
   const save = () => {
     if (!title.trim()) return Alert.alert('请填写检查单名称');
+    if (recurrence === 'weekly' && weekdays.length === 0) {
+      return Alert.alert('请至少选择一个重复的星期');
+    }
     const cleanGroups = groups
       .map((g, gi) => ({
         id: g.dbId, title: g.title.trim() || `分组 ${gi + 1}`, sortOrder: gi,
@@ -73,18 +92,22 @@ export default function TemplateEditScreen() {
       }));
     if (cleanGroups.every((g) => g.items.length === 0)) return Alert.alert('至少添加一个检查项');
 
-    if (editing && checklistId) {
-      actions.updateMeta(checklistId, { title: title.trim(), icon, color });
-      actions.updateRecurrence(checklistId, { recurrence, weekdays });
-      actions.replaceStructure(checklistId, cleanGroups);
-    } else {
-      actions.createChecklist({
-        title: title.trim(), icon, color, recurrence, weekdays,
-        today: todayStr(),
-        groups: cleanGroups.map((g) => ({ title: g.title, items: g.items.map((it) => it.title) })),
-      });
+    try {
+      if (editing && checklistId) {
+        actions.updateMeta(checklistId, { title: title.trim(), icon, color });
+        actions.updateRecurrence(checklistId, { recurrence, weekdays });
+        actions.replaceStructure(checklistId, cleanGroups);
+      } else {
+        actions.createChecklist({
+          title: title.trim(), icon, color, recurrence, weekdays,
+          today: todayStr(),
+          groups: cleanGroups.map((g) => ({ title: g.title, items: g.items.map((it) => it.title) })),
+        });
+      }
+      router.back();
+    } catch {
+      Alert.alert('保存失败，请重试');
     }
-    router.back();
   };
 
   const confirmDelete = () => {
@@ -132,7 +155,7 @@ export default function TemplateEditScreen() {
               <Pressable hitSlop={8} disabled={gi === groups.length - 1} onPress={() => moveGroup(gi, 1)}>
                 <Ionicons name="chevron-down" size={18} color={gi === groups.length - 1 ? '#C7C7CC' : palette.gray} />
               </Pressable>
-              <Pressable hitSlop={8} onPress={() => setGroups((gs) => gs.filter((x) => x.localId !== g.localId))}>
+              <Pressable hitSlop={8} onPress={() => confirmDeleteGroup(g.localId, g.title)}>
                 <Ionicons name="trash-outline" size={16} color={palette.gray} />
               </Pressable>
             </View>

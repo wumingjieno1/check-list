@@ -78,7 +78,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   quickToggle: (row) => {
     if (!row.quickTargetItemId) return;
-    toggleAction(repo, row.occurrenceId, row.quickTargetItemId, Date.now());
+    const { isDone } = toggleAction(repo, row.occurrenceId, row.quickTargetItemId, Date.now());
+    if (isDone) {
+      import('expo-haptics').then((H) =>
+        H.notificationAsync(H.NotificationFeedbackType.Success).catch(() => {}));
+    }
     get().loadToday();
   },
 }));

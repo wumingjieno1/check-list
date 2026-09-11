@@ -3,9 +3,10 @@ import { View, Text, FlatList, Pressable, StyleSheet, Alert, type AlertButton } 
 import { useRouter } from 'expo-router';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { repo, useAppStore, createAppActions } from '@/stores/useAppStore';
-import { completionRate, dayStatus, streak, type DayStatusValue } from '@/services/progress';
+import { completionRate, streak } from '@/services/progress';
+import { buildDayStatusMap, listVirtualDay } from '@/services/history';
 import {
-  addDays, eachDay, formatCN, fromDateStr, toDateStr, todayStr,
+  addDays, eachDay, formatCN, fromDateStr, mondayOfWeek, toDateStr, todayStr,
 } from '@/utils/date';
 import { checklistColors, palette } from '@/theme/colors';
 
@@ -17,24 +18,20 @@ export default function CalendarScreen() {
   const [refresh, setRefresh] = useState(0);
   const actions = useMemo(() => createAppActions(repo), []);
 
-  const windowStart = toDateStr(addDays(fromDateStr(today), -60));
-  const windowEnd = toDateStr(addDays(fromDateStr(today), 30));
-
   const { statusByDate, exceptionDates } = useMemo(() => {
-    const occs = repo.occurrences.listInRange(windowStart, windowEnd);
-    const byDate = new Map<string, string[]>();
-    for (const o of occs) byDate.set(o.dueDate, [...(byDate.get(o.dueDate) ?? []), o.status]);
-    const status: Record<string, DayStatusValue> = {};
-    for (const d of eachDay(windowStart, windowEnd)) {
-      status[d] = dayStatus((byDate.get(d) ?? []).map((s) => ({ status: s })));
-    }
+    const visStart = toDateStr(mondayOfWeek(fromDateStr(month)));
+    const visEnd = toDateStr(addDays(fromDateStr(visStart), 41));
+    const statsStart = toDateStr(addDays(fromDateStr(today), -60));
+    const futureEnd = toDateStr(addDays(fromDateStr(today), 30));
+    const start = visStart < statsStart ? visStart : statsStart;
+    const end = visEnd > futureEnd ? visEnd : futureEnd;
+    const status = buildDayStatusMap(repo, start, end, today);
     const exc = new Set<string>();
     for (const c of repo.checklists.listAll()) {
       repo.exceptions.listForChecklist(c.id).forEach((e) => exc.add(e.date));
     }
     return { statusByDate: status, exceptionDates: exc };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowStart, windowEnd, today, refresh]);
+  }, [month, today, refresh]);
 
   const days30 = useMemo(
     () => eachDay(toDateStr(addDays(fromDateStr(today), -29)), today)
@@ -43,7 +40,7 @@ export default function CalendarScreen() {
   );
 
   const selectedOccs = useMemo(
-    () => repo.occurrences.listByDate(selected),
+    () => listVirtualDay(repo, selected, today),
     [selected, refresh],
   );
 
@@ -85,7 +82,7 @@ export default function CalendarScreen() {
       style={styles.container}
       contentContainerStyle={{ padding: 16 }}
       data={selectedOccs}
-      keyExtractor={(o) => o.id}
+      keyExtractor={(o) => o.id ?? `virtual:${o.checklistId}:${o.dueDate}`}
       ListHeaderComponent={
         <View>
           <View style={styles.stats}>
@@ -114,19 +111,32 @@ export default function CalendarScreen() {
           <Text style={styles.dayTitle}>{formatCN(selected)}</Text>
         </View>
       }
-      renderItem={({ item }) => (
-        <Pressable
-          style={styles.occRow}
-          onPress={() => router.push(`/checklist/${item.id}`)}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.dot, { color: checklistColors[item.color] ?? palette.green }]}>●</Text>
-          <Text style={styles.occTitle}>{item.checklistTitle}</Text>
-          <Text style={[styles.occStatus, item.status === 'done' && styles.occDone]}>
-            {item.status === 'done' ? '已完成' : '未完成'}
-          </Text>
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const label = item.virtual
+          ? '未完成（补算）'
+          : item.status === 'done' ? '已完成' : '未完成';
+        const content = (
+          <>
+            <Text style={[styles.dot, { color: checklistColors[item.color] ?? palette.green }]}>●</Text>
+            <Text style={styles.occTitle}>{item.checklistTitle}</Text>
+            <Text style={[styles.occStatus, !item.virtual && item.status === 'done' && styles.occDone]}>
+              {label}
+            </Text>
+          </>
+        );
+        if (item.virtual || !item.id) {
+          return <View style={[styles.occRow, styles.virtualRow]}>{content}</View>;
+        }
+        return (
+          <Pressable
+            style={styles.occRow}
+            onPress={() => router.push(`/checklist/${item.id}`)}
+            accessibilityRole="button"
+          >
+            {content}
+          </Pressable>
+        );
+      }}
       ListEmptyComponent={<Text style={styles.emptyDay}>当天没有检查安排</Text>}
     />
   );
@@ -145,5 +155,6 @@ const styles = StyleSheet.create({
   occTitle: { flex: 1, fontSize: 15, color: palette.text },
   occStatus: { fontSize: 13, color: palette.subtext },
   occDone: { color: palette.green, fontWeight: '600' },
+  virtualRow: { opacity: 0.6 },
   emptyDay: { color: palette.subtext, textAlign: 'center', marginTop: 16 },
 });

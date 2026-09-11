@@ -6,9 +6,10 @@ import { TodayCard } from '@/features/today/TodayCard';
 import { EmptyState } from '@/components/EmptyState';
 import { palette } from '@/theme/colors';
 import {
-  addDays, eachDay, formatCN, fromDateStr, toDateStr, todayStr, weekday,
+  addDays, formatCN, fromDateStr, toDateStr, todayStr, weekday,
 } from '@/utils/date';
-import { dayStatus, streak } from '@/services/progress';
+import { streak } from '@/services/progress';
+import { buildDayStatusMap } from '@/services/history';
 
 const WEEK_CN = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
@@ -29,14 +30,7 @@ export default function TodayScreen() {
 
   const streakCount = useMemo(() => {
     const start = toDateStr(addDays(fromDateStr(today), -29));
-    const occs = repo.occurrences.listInRange(start, today);
-    const byDate = new Map<string, string[]>();
-    for (const o of occs) byDate.set(o.dueDate, [...(byDate.get(o.dueDate) ?? []), o.status]);
-    const map: Record<string, 'done' | 'partial' | 'missed' | 'none'> = {};
-    for (const d of eachDay(start, today)) {
-      map[d] = dayStatus((byDate.get(d) ?? []).map((status) => ({ status })));
-    }
-    return streak(map, today);
+    return streak(buildDayStatusMap(repo, start, today, today), today);
   }, [today, rows]);
 
   const greeting = (() => {

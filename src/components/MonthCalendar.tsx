@@ -53,7 +53,7 @@ export function MonthCalendar(p: Props) {
               key={d}
               onPress={() => p.onSelect(d)}
               onLongPress={() => p.onLongPress(d)}
-              style={[styles.cell, d === p.selected && styles.selected]}
+              style={[styles.cell, d === p.today && styles.todayCell, d === p.selected && styles.selected]}
             >
               <Text style={[styles.day, !inMonth && styles.outside, d === p.today && styles.todayText]}>
                 {Number(d.slice(8, 10))}
@@ -79,6 +79,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', paddingTop: 6, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
   selected: { borderColor: palette.blue },
+  todayCell: { borderColor: palette.lightGray },
   day: { fontSize: 13, color: palette.text },
   outside: { color: '#C7C7CC' },
   todayText: { fontWeight: '800', color: palette.blue },
