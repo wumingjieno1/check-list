@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, Keyboard, KeyboardAvoidingView, Platform,
-  TouchableOpacity,
+  TouchableOpacity, Dimensions,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { NestableDraggableFlatList, NestableScrollContainer, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { useSafeNestableScrollContainerContext } from 'react-native-draggable-flatlist/src/context/nestableScrollContainerContext';
 import { repo, createAppActions } from '@/stores/useAppStore';
 import { RepeaterEditor } from '@/features/template/RepeaterEditor';
 import { checklistColors, palette } from '@/theme/colors';
@@ -26,56 +27,6 @@ export default function TemplateEditScreen() {
   const actions = useMemo(() => createAppActions(repo), []);
 
   const scrollRef = useRef<any>(null);
-  const contentRef = useRef<any>(null);
-  const focusedInput = useRef<any>(null);
-  const keyboardY = useRef<number | null>(null);
-
-  const scrollFocusedAboveKeyboard = useCallback(() => {
-    if (Platform.OS !== 'android') return;
-    const input = focusedInput.current;
-    const scroll = scrollRef.current?.getNativeScrollRef?.() ?? scrollRef.current;
-    const content = contentRef.current;
-    if (!input || !scroll || !content) return;
-
-    input.measureInWindow((_ix: number, iy: number, _iw: number, ih: number) => {
-      scroll.measureInWindow((_sx: number, sy: number, _sw: number, sh: number) => {
-        content.measureInWindow((_cx: number, cy: number) => {
-          const currentOffset = cy - sy;
-          const margin = 16;
-          const kbY = keyboardY.current ?? sy + sh;
-          let target: number | null = null;
-          if (iy + ih > kbY - margin) {
-            target = currentOffset + (iy + ih - kbY + margin);
-          } else if (iy < sy + margin) {
-            target = currentOffset - (sy + margin - iy);
-          }
-          if (target != null) {
-            scrollRef.current.scrollTo({ y: Math.max(0, target), animated: true });
-          }
-        });
-      });
-    });
-  }, []);
-
-  const onInputFocus = useCallback((e: any) => {
-    if (Platform.OS !== 'android') return;
-    focusedInput.current = e.currentTarget;
-    setTimeout(scrollFocusedAboveKeyboard, 30);
-    setTimeout(scrollFocusedAboveKeyboard, 120);
-    setTimeout(scrollFocusedAboveKeyboard, 300);
-  }, [scrollFocusedAboveKeyboard]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const show = Keyboard.addListener('keyboardDidShow', (ev) => {
-      keyboardY.current = ev.endCoordinates.screenY;
-      scrollFocusedAboveKeyboard();
-    });
-    const hide = Keyboard.addListener('keyboardDidHide', () => {
-      keyboardY.current = null;
-    });
-    return () => { show.remove(); hide.remove(); };
-  }, [scrollFocusedAboveKeyboard]);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -178,95 +129,182 @@ export default function TemplateEditScreen() {
           <Pressable onPress={save} hitSlop={10}><Text style={{ color: palette.blue, fontSize: 16, fontWeight: '600' }}>保存</Text></Pressable>
         ),
       }} />
-      <NestableScrollContainer
-        ref={scrollRef}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-      >
-        <View ref={contentRef} style={styles.formContent}>
-        <TextInput
-          style={styles.input}
-          placeholder="检查单名称"
-          value={title}
-          onChangeText={setTitle}
-          onFocus={onInputFocus}
+      <NestableScrollContainer ref={scrollRef} keyboardShouldPersistTaps="handled">
+        <FormBody
+          scrollRef={scrollRef}
+          title={title} setTitle={setTitle}
+          icon={icon} setIcon={setIcon}
+          color={color} setColor={setColor}
+          recurrence={recurrence}
+          weekdays={weekdays}
+          onRecurrenceChange={(r, w) => { setRecurrence(r); setWeekdays(w); }}
+          groups={groups}
+          updateGroup={updateGroup}
+          updateItem={updateItem}
+          removeItem={removeItem}
+          addItem={addItem}
+          moveGroup={moveGroup}
+          confirmDeleteGroup={confirmDeleteGroup}
+          addGroup={() => setGroups((gs) => [...gs, { localId: uuid(), title: `分组 ${gs.length + 1}`, items: [] }])}
+          onDragEnd={(localId, data) => updateGroup(localId, { items: data })}
+          confirmDelete={confirmDelete}
+          editing={!!editing}
         />
-
-        <View style={styles.row}>
-          {ICON_OPTIONS.map((name) => (
-            <Pressable key={name} onPress={() => setIcon(name)} style={[styles.iconBtn, icon === name && { backgroundColor: palette.lightGray }]}>
-              <Ionicons name={name as any} size={20} color={icon === name ? palette.blue : palette.gray} />
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.row}>
-          {COLOR_OPTIONS.map((c) => (
-            <Pressable key={c} onPress={() => setColor(c)} style={[styles.colorDot, { backgroundColor: checklistColors[c] }, color === c && styles.colorSelected]} accessibilityRole="button" />
-          ))}
-        </View>
-
-        <Text style={styles.label}>重复</Text>
-        <RepeaterEditor recurrence={recurrence} weekdays={weekdays} onChange={(r, w) => { setRecurrence(r); setWeekdays(w); }} />
-
-        {groups.map((g, gi) => (
-          <View key={g.localId} style={styles.groupCard}>
-            <View style={styles.groupHeader}>
-              <TextInput
-                style={styles.groupTitle}
-                value={g.title}
-                onChangeText={(t) => updateGroup(g.localId, { title: t })}
-                onFocus={onInputFocus}
-              />
-              <Pressable hitSlop={8} disabled={gi === 0} onPress={() => moveGroup(gi, -1)}>
-                <Ionicons name="chevron-up" size={18} color={gi === 0 ? '#C7C7CC' : palette.gray} />
-              </Pressable>
-              <Pressable hitSlop={8} disabled={gi === groups.length - 1} onPress={() => moveGroup(gi, 1)}>
-                <Ionicons name="chevron-down" size={18} color={gi === groups.length - 1 ? '#C7C7CC' : palette.gray} />
-              </Pressable>
-              <Pressable hitSlop={8} onPress={() => confirmDeleteGroup(g.localId, g.title)}>
-                <Ionicons name="trash-outline" size={16} color={palette.gray} />
-              </Pressable>
-            </View>
-
-            <NestableDraggableFlatList
-              data={g.items}
-              keyExtractor={(it) => it.localId}
-              renderItem={({ item, drag }) => (
-                <ScaleDecorator>
-                  <TouchableOpacity onLongPress={drag} activeOpacity={0.7} style={styles.itemRow}>
-                    <Ionicons name="reorder-three-outline" size={22} color={palette.gray} />
-                    <TextInput
-                      style={styles.itemInput}
-                      placeholder="检查项"
-                      value={item.title}
-                      onChangeText={(t) => updateItem(g.localId, item.localId, t)}
-                      onFocus={onInputFocus}
-                    />
-                    <Pressable hitSlop={8} onPress={() => removeItem(g.localId, item.localId)}>
-                      <Ionicons name="close-circle-outline" size={18} color={palette.gray} />
-                    </Pressable>
-                  </TouchableOpacity>
-                </ScaleDecorator>
-              )}
-              onDragEnd={({ data }) => updateGroup(g.localId, { items: data })}
-            />
-            <Pressable onPress={() => addItem(g.localId)} style={styles.addItem}>
-              <Ionicons name="add" size={16} color={palette.blue} />
-              <Text style={styles.addItemText}>添加检查项</Text>
-            </Pressable>
-          </View>
-        ))}
-
-        <Pressable onPress={() => setGroups((gs) => [...gs, { localId: uuid(), title: `分组 ${gs.length + 1}`, items: [] }])} style={styles.addGroup}>
-          <Text style={styles.addGroupText}>＋ 添加分组</Text>
-        </Pressable>
-
-        <Pressable onPress={confirmDelete} style={styles.deleteBtn}>
-          <Text style={styles.deleteText}>{editing ? '删除检查单' : '取消'}</Text>
-        </Pressable>
-        </View>
       </NestableScrollContainer>
     </KeyboardAvoidingView>
+  );
+}
+
+interface FormBodyProps {
+  scrollRef: any;
+  title: string; setTitle: (t: string) => void;
+  icon: string; setIcon: (i: string) => void;
+  color: string; setColor: (c: string) => void;
+  recurrence: RecurrenceType;
+  weekdays: number[];
+  onRecurrenceChange: (r: RecurrenceType, w: number[]) => void;
+  groups: LocalGroup[];
+  updateGroup: (id: string, patch: Partial<LocalGroup>) => void;
+  updateItem: (gid: string, iid: string, title: string) => void;
+  removeItem: (gid: string, iid: string) => void;
+  addItem: (gid: string) => void;
+  moveGroup: (index: number, delta: number) => void;
+  confirmDeleteGroup: (id: string, title: string) => void;
+  addGroup: () => void;
+  onDragEnd: (gid: string, data: LocalItem[]) => void;
+  confirmDelete: () => void;
+  editing: boolean;
+}
+
+function FormBody(p: FormBodyProps) {
+  const { outerScrollOffset } = useSafeNestableScrollContainerContext();
+  const focusedInput = useRef<any>(null);
+  const keyboardH = useRef(0);
+
+  const scrollFocusedIntoView = useCallback(() => {
+    if (Platform.OS !== 'android') return;
+    const input = focusedInput.current;
+    const scroll = p.scrollRef.current;
+    if (!input || !scroll || keyboardH.current === 0) return;
+
+    input.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+      const gap = 16;
+      const visibleBottom = Dimensions.get('window').height - keyboardH.current;
+      const current = outerScrollOffset.value;
+      let target: number | null = null;
+      if (y + h > visibleBottom - gap) {
+        target = current + (y + h - visibleBottom + gap);
+      } else if (y < gap) {
+        target = current - (gap - y);
+      }
+      if (target != null) scroll.scrollTo({ y: Math.max(0, target), animated: true });
+    });
+  }, [outerScrollOffset, p.scrollRef]);
+
+  const onInputFocus = useCallback((e: any) => {
+    focusedInput.current = e.currentTarget;
+    if (Platform.OS !== 'android') return;
+    setTimeout(scrollFocusedIntoView, 50);
+    setTimeout(scrollFocusedIntoView, 150);
+    setTimeout(scrollFocusedIntoView, 350);
+  }, [scrollFocusedIntoView]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', (ev) => {
+      keyboardH.current = ev.endCoordinates.height;
+      setTimeout(scrollFocusedIntoView, 0);
+      setTimeout(scrollFocusedIntoView, 150);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardH.current = 0;
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, [scrollFocusedIntoView]);
+
+  return (
+    <View style={styles.formContent}>
+      <TextInput
+        style={styles.input}
+        placeholder="检查单名称"
+        value={p.title}
+        onChangeText={p.setTitle}
+        onFocus={onInputFocus}
+      />
+
+      <View style={styles.row}>
+        {ICON_OPTIONS.map((name) => (
+          <Pressable key={name} onPress={() => p.setIcon(name)} style={[styles.iconBtn, p.icon === name && { backgroundColor: palette.lightGray }]}>
+            <Ionicons name={name as any} size={20} color={p.icon === name ? palette.blue : palette.gray} />
+          </Pressable>
+        ))}
+      </View>
+      <View style={styles.row}>
+        {COLOR_OPTIONS.map((c) => (
+          <Pressable key={c} onPress={() => p.setColor(c)} style={[styles.colorDot, { backgroundColor: checklistColors[c] }, p.color === c && styles.colorSelected]} accessibilityRole="button" />
+        ))}
+      </View>
+
+      <Text style={styles.label}>重复</Text>
+      <RepeaterEditor recurrence={p.recurrence} weekdays={p.weekdays} onChange={p.onRecurrenceChange} />
+
+      {p.groups.map((g, gi) => (
+        <View key={g.localId} style={styles.groupCard}>
+          <View style={styles.groupHeader}>
+            <TextInput
+              style={styles.groupTitle}
+              value={g.title}
+              onChangeText={(t) => p.updateGroup(g.localId, { title: t })}
+              onFocus={onInputFocus}
+            />
+            <Pressable hitSlop={8} disabled={gi === 0} onPress={() => p.moveGroup(gi, -1)}>
+              <Ionicons name="chevron-up" size={18} color={gi === 0 ? '#C7C7CC' : palette.gray} />
+            </Pressable>
+            <Pressable hitSlop={8} disabled={gi === p.groups.length - 1} onPress={() => p.moveGroup(gi, 1)}>
+              <Ionicons name="chevron-down" size={18} color={gi === p.groups.length - 1 ? '#C7C7CC' : palette.gray} />
+            </Pressable>
+            <Pressable hitSlop={8} onPress={() => p.confirmDeleteGroup(g.localId, g.title)}>
+              <Ionicons name="trash-outline" size={16} color={palette.gray} />
+            </Pressable>
+          </View>
+
+          <NestableDraggableFlatList
+            data={g.items}
+            keyExtractor={(it) => it.localId}
+            renderItem={({ item, drag }) => (
+              <ScaleDecorator>
+                <TouchableOpacity onLongPress={drag} activeOpacity={0.7} style={styles.itemRow}>
+                  <Ionicons name="reorder-three-outline" size={22} color={palette.gray} />
+                  <TextInput
+                    style={styles.itemInput}
+                    placeholder="检查项"
+                    value={item.title}
+                    onChangeText={(t) => p.updateItem(g.localId, item.localId, t)}
+                    onFocus={onInputFocus}
+                  />
+                  <Pressable hitSlop={8} onPress={() => p.removeItem(g.localId, item.localId)}>
+                    <Ionicons name="close-circle-outline" size={18} color={palette.gray} />
+                  </Pressable>
+                </TouchableOpacity>
+              </ScaleDecorator>
+            )}
+            onDragEnd={({ data }) => p.onDragEnd(g.localId, data)}
+          />
+          <Pressable onPress={() => p.addItem(g.localId)} style={styles.addItem}>
+            <Ionicons name="add" size={16} color={palette.blue} />
+            <Text style={styles.addItemText}>添加检查项</Text>
+          </Pressable>
+        </View>
+      ))}
+
+      <Pressable onPress={p.addGroup} style={styles.addGroup}>
+        <Text style={styles.addGroupText}>＋ 添加分组</Text>
+      </Pressable>
+
+      <Pressable onPress={p.confirmDelete} style={styles.deleteBtn}>
+        <Text style={styles.deleteText}>{p.editing ? '删除检查单' : '取消'}</Text>
+      </Pressable>
+    </View>
   );
 }
 

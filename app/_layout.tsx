@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, AppState, Platform, type AppStateStatus } from 'react-native';
+import { View, Text, ActivityIndicator, AppState, LogBox, Platform, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppStore } from '@/stores/useAppStore';
 import { palette } from '@/theme/colors';
+
+LogBox.ignoreLogs([
+  'ref.measureLayout must be called with a ref to a native component',
+]);
 
 export default function RootLayout() {
   const hydrate = useAppStore((s) => s.hydrate);
