@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
-  TouchableOpacity, findNodeHandle,
+  View, Text, TextInput, Pressable, StyleSheet, Alert, Keyboard, KeyboardAvoidingView, Platform,
+  TouchableOpacity, UIManager, findNodeHandle,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +26,54 @@ export default function TemplateEditScreen() {
   const actions = useMemo(() => createAppActions(repo), []);
 
   const scrollRef = useRef<any>(null);
+  const focusedNode = useRef<any>(null);
+  const keyboardY = useRef<number | null>(null);
+
+  const scrollFocusedAboveKeyboard = useCallback(() => {
+    if (Platform.OS !== 'android') return;
+    const inputHost = focusedNode.current;
+    const scroll = scrollRef.current;
+    const scrollHost = scroll?.getNativeScrollRef?.() ?? scroll;
+    if (inputHost == null || scrollHost == null) return;
+
+    inputHost.measureInWindow((_ix: number, iy: number, _iw: number, ih: number) => {
+      scrollHost.measureInWindow((_sx: number, sy: number, _sw: number, sh: number) => {
+        UIManager.measureLayout(
+          inputHost,
+          scrollHost,
+          () => {},
+          (_x: number, contentY: number) => {
+            const currentOffset = contentY - (iy - sy);
+            const margin = 24;
+            const kbY = keyboardY.current ?? sy + sh;
+            let target: number | null = null;
+            if (iy + ih > kbY - margin) {
+              target = currentOffset + (iy + ih - kbY + margin);
+            } else if (iy < sy + 8) {
+              target = currentOffset - (sy + 8 - iy);
+            }
+            if (target != null) scroll.scrollTo({ y: Math.max(0, target), animated: true });
+          },
+        );
+      });
+    });
+  }, []);
+
+  const onInputFocus = useCallback((e: any) => {
+    if (Platform.OS !== 'android') return;
+    focusedNode.current = findNodeHandle(e.currentTarget as any);
+    setTimeout(scrollFocusedAboveKeyboard, 60);
+    setTimeout(scrollFocusedAboveKeyboard, 260);
+  }, [scrollFocusedAboveKeyboard]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = Keyboard.addListener('keyboardDidShow', (ev) => {
+      keyboardY.current = ev.endCoordinates.screenY;
+      scrollFocusedAboveKeyboard();
+    });
+    return () => sub.remove();
+  }, [scrollFocusedAboveKeyboard]);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -81,17 +129,6 @@ export default function TemplateEditScreen() {
       },
     ]);
   };
-
-  const onInputFocus = useCallback((e: any) => {
-    if (Platform.OS !== 'android') return;
-    const node = findNodeHandle(e.currentTarget as any);
-    const scroll = scrollRef.current;
-    if (node == null || !scroll) return;
-    const scrollToInput = () =>
-      scroll.scrollResponderScrollNativeHandleToKeyboard?.(node, 24, true);
-    setTimeout(scrollToInput, 60);
-    setTimeout(scrollToInput, 250);
-  }, []);
 
   const save = () => {
     if (!title.trim()) return Alert.alert('请填写检查单名称');
