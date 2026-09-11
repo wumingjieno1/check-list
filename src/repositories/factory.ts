@@ -243,5 +243,17 @@ export function createRepositories(db: AnyDb) {
           }));
       },
     },
+
+    dumpAll() {
+      return {
+        checklists: db.select().from(checklists).all(),
+        groups: db.select().from(groups).all(),
+        items: db.select().from(items).all(),
+        occurrences: db.select().from(occurrences).all(),
+        occurrenceItems: db.select().from(occurrenceItems).all(),
+        itemResults: db.select().from(itemResults).all(),
+        dateExceptions: db.select().from(dateExceptions).all(),
+      };
+    },
   };
 }
