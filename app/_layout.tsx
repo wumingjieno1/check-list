@@ -8,6 +8,7 @@ import { palette } from '@/theme/colors';
 
 LogBox.ignoreLogs([
   'ref.measureLayout must be called with a ref to a native component',
+  'InteractionManager has been deprecated',
 ]);
 
 if (__DEV__) {
