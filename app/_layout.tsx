@@ -11,15 +11,6 @@ LogBox.ignoreLogs([
   'InteractionManager has been deprecated',
 ]);
 
-if (__DEV__) {
-  const origError = console.error;
-  console.error = (...args: unknown[]) => {
-    const first = typeof args[0] === 'string' ? args[0] : '';
-    if (first.includes('ref.measureLayout must be called with a ref to a native component')) return;
-    origError(...args as []);
-  };
-}
-
 export default function RootLayout() {
   const hydrate = useAppStore((s) => s.hydrate);
   const loadToday = useAppStore((s) => s.loadToday);
