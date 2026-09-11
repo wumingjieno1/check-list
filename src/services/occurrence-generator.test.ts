@@ -73,10 +73,8 @@ describe('ensureWindow', () => {
 describe('rebuildFutureForChecklist', () => {
   it('改规则后重建未触碰的未来实例，保留有勾选的', () => {
     ensureWindow(repo, '2026-09-10', 3, 100);
-    // 勾选 09-11
     const oi = repo.occurrences.getFlatItems('occ:c1:2026-09-11')[0].id;
     repo.results.toggle(oi, 200);
-    // 改为 workdays：09-12(周六)、09-13(周日) 应消失；09-11 有勾选保留
     repo.checklists.update('c1', { recurrence: 'workdays' });
     rebuildFutureForChecklist(repo, 'c1', '2026-09-10', 3, 300);
     const dates = repo.occurrences.listInRange('2026-09-10', '2026-09-13').map((o) => o.dueDate);
@@ -94,5 +92,25 @@ describe('rebuildFutureForChecklist', () => {
     rebuildFutureForChecklist(repo, 'c1', '2026-09-11', 2, 200);
     expect(repo.occurrences.listInRange('2026-09-10', '2026-09-13').map((o) => o.dueDate))
       .toEqual(['2026-09-10']);
+  });
+
+  it('编辑 none 检查单（仅改标题）不删除其今日未完成实例', () => {
+    repo.checklists.create({ id: 'c2', title: '一次性', icon: 'star', color: 'blue', recurrence: 'none', weekdays: [], sortOrder: 1, createdAt: 2 });
+    repo.groups.create({ id: 'g2', checklistId: 'c2', title: 'G', sortOrder: 0 });
+    repo.items.create({ id: 'i2', groupId: 'g2', title: 'X', sortOrder: 0 });
+    repo.occurrences.createWithItems(
+      'occ:c2:2026-09-10', 'c2', '2026-09-10', repo.checklists.getStructure('c2'), 100,
+    );
+    repo.checklists.update('c2', { title: '一次性改名' });
+    rebuildFutureForChecklist(repo, 'c2', '2026-09-10', 30, 200);
+    expect(repo.occurrences.exists('c2', '2026-09-10')).toBe(true);
+  });
+
+  it('daily 改为 none 时保留今日实例、仅清空未来', () => {
+    ensureWindow(repo, '2026-09-10', 3, 100);
+    repo.checklists.update('c1', { recurrence: 'none' });
+    rebuildFutureForChecklist(repo, 'c1', '2026-09-10', 3, 200);
+    const dates = repo.occurrences.listInRange('2026-09-10', '2026-09-13').map((o) => o.dueDate);
+    expect(dates).toEqual(['2026-09-10']);
   });
 });

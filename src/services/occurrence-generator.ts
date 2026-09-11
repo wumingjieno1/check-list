@@ -32,9 +32,15 @@ export function ensureWindow(repo: Repo, today: string, daysAhead: number, now: 
 }
 
 export function rebuildFutureForChecklist(repo: Repo, checklistId: string, today: string, daysAhead: number, now: number) {
-  repo.occurrences.deleteFutureUntouched(checklistId, today);
   const c = repo.checklists.get(checklistId);
-  if (!c || c.isArchived || c.recurrence === 'none' || isEmptyTemplate(repo, checklistId)) return;
+  if (!c || c.isArchived) return;
+  if (c.recurrence === 'none') {
+    const tomorrow = toDateStr(addDays(fromDateStr(today), 1));
+    repo.occurrences.deleteFutureUntouched(checklistId, tomorrow);
+    return;
+  }
+  repo.occurrences.deleteFutureUntouched(checklistId, today);
+  if (isEmptyTemplate(repo, checklistId)) return;
   for (const dueDate of scheduleFor(repo, checklistId, c.recurrence, c.weekdays, today, daysAhead)) {
     if (repo.occurrences.exists(checklistId, dueDate)) continue;
     repo.occurrences.createWithItems(
