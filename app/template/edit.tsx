@@ -28,6 +28,7 @@ export default function TemplateEditScreen() {
 
   const scrollRef = useRef<any>(null);
   const bodyRef = useRef<FormBodyHandle>(null);
+  const pendingFocusItem = useRef<string | null>(null);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -51,9 +52,11 @@ export default function TemplateEditScreen() {
   }, []);
 
   const addItem = useCallback((groupLocalId: string) => {
+    const newId = uuid();
+    pendingFocusItem.current = newId;
     setGroups((gs) => gs.map((g) =>
       g.localId === groupLocalId
-        ? { ...g, items: [...g.items, { localId: uuid(), title: '' }] }
+        ? { ...g, items: [...g.items, { localId: newId, title: '' }] }
         : g));
     scrollToEndSoon();
   }, [scrollToEndSoon]);
@@ -152,6 +155,7 @@ export default function TemplateEditScreen() {
           updateItem={updateItem}
           removeItem={removeItem}
           addItem={addItem}
+          pendingFocusItem={pendingFocusItem}
           moveGroup={moveGroup}
           confirmDeleteGroup={confirmDeleteGroup}
           addGroup={() => {
@@ -180,6 +184,7 @@ interface FormBodyProps {
   updateItem: (gid: string, iid: string, title: string) => void;
   removeItem: (gid: string, iid: string) => void;
   addItem: (gid: string) => void;
+  pendingFocusItem: React.MutableRefObject<string | null>;
   moveGroup: (index: number, delta: number) => void;
   confirmDeleteGroup: (id: string, title: string) => void;
   addGroup: () => void;
@@ -196,6 +201,7 @@ const FormBody = forwardRef<FormBodyHandle, FormBodyProps>(function FormBody(p, 
   const { outerScrollOffset } = useSafeNestableScrollContainerContext();
   const focusedInput = useRef<any>(null);
   const keyboardH = useRef(0);
+  const inputRefs = useRef(new Map<string, any>());
 
   useImperativeHandle(ref, () => ({
     scrollToEnd: () => {
@@ -244,6 +250,20 @@ const FormBody = forwardRef<FormBodyHandle, FormBodyProps>(function FormBody(p, 
     });
     return () => { show.remove(); hide.remove(); };
   }, [scrollFocusedIntoView]);
+
+  useEffect(() => {
+    const id = p.pendingFocusItem.current;
+    if (!id || !inputRefs.current.has(id)) return;
+    p.pendingFocusItem.current = null;
+    const node = inputRefs.current.get(id);
+    setTimeout(() => {
+      focusedInput.current = node;
+      node?.focus?.();
+      setTimeout(scrollFocusedIntoView, 80);
+      setTimeout(scrollFocusedIntoView, 240);
+      setTimeout(scrollFocusedIntoView, 420);
+    }, 140);
+  });
 
   return (
     <View style={styles.formContent}>
@@ -299,6 +319,10 @@ const FormBody = forwardRef<FormBodyHandle, FormBodyProps>(function FormBody(p, 
                 <TouchableOpacity onLongPress={drag} activeOpacity={0.7} style={styles.itemRow}>
                   <Ionicons name="reorder-three-outline" size={22} color={palette.gray} />
                   <TextInput
+                    ref={(r: any) => {
+                      if (r) inputRefs.current.set(item.localId, r);
+                      else inputRefs.current.delete(item.localId);
+                    }}
                     style={styles.itemInput}
                     placeholder="检查项"
                     value={item.title}
