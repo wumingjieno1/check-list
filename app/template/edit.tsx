@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
-  TouchableOpacity,
+  TouchableOpacity, findNodeHandle,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +24,8 @@ export default function TemplateEditScreen() {
   const { checklistId } = useLocalSearchParams<{ checklistId?: string }>();
   const editing = checklistId ? repo.checklists.get(checklistId) : null;
   const actions = useMemo(() => createAppActions(repo), []);
+
+  const scrollRef = useRef<any>(null);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -80,6 +82,17 @@ export default function TemplateEditScreen() {
     ]);
   };
 
+  const onInputFocus = useCallback((e: any) => {
+    if (Platform.OS !== 'android') return;
+    const node = findNodeHandle(e.currentTarget as any);
+    const scroll = scrollRef.current;
+    if (node == null || !scroll) return;
+    const scrollToInput = () =>
+      scroll.scrollResponderScrollNativeHandleToKeyboard?.(node, 24, true);
+    setTimeout(scrollToInput, 60);
+    setTimeout(scrollToInput, 250);
+  }, []);
+
   const save = () => {
     if (!title.trim()) return Alert.alert('请填写检查单名称');
     if (recurrence === 'weekly' && weekdays.length === 0) {
@@ -126,8 +139,19 @@ export default function TemplateEditScreen() {
           <Pressable onPress={save} hitSlop={10}><Text style={{ color: palette.blue, fontSize: 16, fontWeight: '600' }}>保存</Text></Pressable>
         ),
       }} />
-      <NestableScrollContainer contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-        <TextInput style={styles.input} placeholder="检查单名称" value={title} onChangeText={setTitle} />
+      <NestableScrollContainer
+        ref={scrollRef}
+        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
+        <TextInput
+          style={styles.input}
+          placeholder="检查单名称"
+          value={title}
+          onChangeText={setTitle}
+          onFocus={onInputFocus}
+        />
 
         <View style={styles.row}>
           {ICON_OPTIONS.map((name) => (
@@ -148,7 +172,12 @@ export default function TemplateEditScreen() {
         {groups.map((g, gi) => (
           <View key={g.localId} style={styles.groupCard}>
             <View style={styles.groupHeader}>
-              <TextInput style={styles.groupTitle} value={g.title} onChangeText={(t) => updateGroup(g.localId, { title: t })} />
+              <TextInput
+                style={styles.groupTitle}
+                value={g.title}
+                onChangeText={(t) => updateGroup(g.localId, { title: t })}
+                onFocus={onInputFocus}
+              />
               <Pressable hitSlop={8} disabled={gi === 0} onPress={() => moveGroup(gi, -1)}>
                 <Ionicons name="chevron-up" size={18} color={gi === 0 ? '#C7C7CC' : palette.gray} />
               </Pressable>
@@ -172,6 +201,7 @@ export default function TemplateEditScreen() {
                       placeholder="检查项"
                       value={item.title}
                       onChangeText={(t) => updateItem(g.localId, item.localId, t)}
+                      onFocus={onInputFocus}
                     />
                     <Pressable hitSlop={8} onPress={() => removeItem(g.localId, item.localId)}>
                       <Ionicons name="close-circle-outline" size={18} color={palette.gray} />

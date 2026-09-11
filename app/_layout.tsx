@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, AppState, type AppStateStatus } from 'react-native';
+import { View, Text, ActivityIndicator, AppState, Platform, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -51,7 +51,13 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="checklist/[id]" options={{ presentation: 'card', headerShown: true, title: '' }} />
-        <Stack.Screen name="template/edit" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen
+          name="template/edit"
+          options={{
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+            headerShown: false,
+          }}
+        />
       </Stack>
     </GestureHandlerRootView>
   );
