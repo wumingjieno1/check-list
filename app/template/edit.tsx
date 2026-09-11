@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, Keyboard, KeyboardAvoidingView, Platform,
   TouchableOpacity, Dimensions,
@@ -27,6 +27,7 @@ export default function TemplateEditScreen() {
   const actions = useMemo(() => createAppActions(repo), []);
 
   const scrollRef = useRef<any>(null);
+  const bodyRef = useRef<FormBodyHandle>(null);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -44,11 +45,18 @@ export default function TemplateEditScreen() {
   const updateGroup = useCallback((localId: string, patch: Partial<LocalGroup>) =>
     setGroups((gs) => gs.map((g) => (g.localId === localId ? { ...g, ...patch } : g))), []);
 
-  const addItem = useCallback((groupLocalId: string) =>
+  const scrollToEndSoon = useCallback(() => {
+    setTimeout(() => bodyRef.current?.scrollToEnd(), 80);
+    setTimeout(() => bodyRef.current?.scrollToEnd(), 260);
+  }, []);
+
+  const addItem = useCallback((groupLocalId: string) => {
     setGroups((gs) => gs.map((g) =>
       g.localId === groupLocalId
         ? { ...g, items: [...g.items, { localId: uuid(), title: '' }] }
-        : g)), []);
+        : g));
+    scrollToEndSoon();
+  }, [scrollToEndSoon]);
 
   const updateItem = useCallback((groupLocalId: string, itemLocalId: string, title: string) =>
     setGroups((gs) => gs.map((g) =>
@@ -131,6 +139,7 @@ export default function TemplateEditScreen() {
       }} />
       <NestableScrollContainer ref={scrollRef} keyboardShouldPersistTaps="handled">
         <FormBody
+          ref={bodyRef}
           scrollRef={scrollRef}
           title={title} setTitle={setTitle}
           icon={icon} setIcon={setIcon}
@@ -145,7 +154,10 @@ export default function TemplateEditScreen() {
           addItem={addItem}
           moveGroup={moveGroup}
           confirmDeleteGroup={confirmDeleteGroup}
-          addGroup={() => setGroups((gs) => [...gs, { localId: uuid(), title: `分组 ${gs.length + 1}`, items: [] }])}
+          addGroup={() => {
+            setGroups((gs) => [...gs, { localId: uuid(), title: `分组 ${gs.length + 1}`, items: [] }]);
+            scrollToEndSoon();
+          }}
           onDragEnd={(localId, data) => updateGroup(localId, { items: data })}
           confirmDelete={confirmDelete}
           editing={!!editing}
@@ -176,10 +188,21 @@ interface FormBodyProps {
   editing: boolean;
 }
 
-function FormBody(p: FormBodyProps) {
+export interface FormBodyHandle {
+  scrollToEnd: () => void;
+}
+
+const FormBody = forwardRef<FormBodyHandle, FormBodyProps>(function FormBody(p, ref) {
   const { outerScrollOffset } = useSafeNestableScrollContainerContext();
   const focusedInput = useRef<any>(null);
   const keyboardH = useRef(0);
+
+  useImperativeHandle(ref, () => ({
+    scrollToEnd: () => {
+      const scroll = p.scrollRef.current;
+      if (scroll) scroll.scrollToEnd({ animated: true });
+    },
+  }), [p.scrollRef]);
 
   const scrollFocusedIntoView = useCallback(() => {
     if (Platform.OS !== 'android') return;
@@ -306,7 +329,7 @@ function FormBody(p: FormBodyProps) {
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   formContent: { padding: 16, paddingBottom: 64 },
