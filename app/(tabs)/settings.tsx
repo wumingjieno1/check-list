@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import { Provider as AntProvider, List, Button, ActivityIndicator } from '@ant-design/react-native';
+import { IconOutline } from '@ant-design/icons-react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { repo } from '@/stores/useAppStore';
 import { buildExportJson } from '@/services/export';
 import { palette } from '@/theme/colors';
 
-export default function SettingsScreen() {
+function SettingsScreenInner() {
   const [busy, setBusy] = useState(false);
 
   const exportData = async () => {
@@ -37,25 +39,48 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Pressable style={styles.row} onPress={exportData} disabled={busy} accessibilityRole="button">
-        <Text style={styles.rowText}>导出数据（JSON 备份）</Text>
-        {busy ? <ActivityIndicator color={palette.blue} /> : <Text style={styles.chevron}>›</Text>}
-      </Pressable>
-      <View style={[styles.row, styles.disabled]}>
-        <Text style={[styles.rowText, { color: palette.subtext }]}>每日提醒（即将推出）</Text>
-        <Text style={styles.chevron}>›</Text>
+      <List renderHeader="数据">
+        <List.Item
+          thumb={<IconOutline name="export" size={22} color={palette.blue} />}
+          extra={busy ? <ActivityIndicator size="small" /> : <IconOutline name="right" size={18} color={palette.gray} />}
+          onPress={busy ? undefined : exportData}
+        >
+          导出数据（JSON 备份）
+        </List.Item>
+      </List>
+
+      <List renderHeader="提醒">
+        <List.Item
+          thumb={<IconOutline name="notification" size={22} color={palette.subtext} />}
+          extra={<Text style={styles.soon}>即将推出</Text>}
+        >
+          <Text style={styles.disabledText}>每日提醒</Text>
+        </List.Item>
+      </List>
+
+      <View style={styles.actions}>
+        <Button type="primary" onPress={exportData} loading={busy}>
+          导出 JSON 备份
+        </Button>
       </View>
+
       <Text style={styles.version}>检查清单 v0.1.0 · 数据仅保存在本机</Text>
     </View>
   );
 }
 
+export default function SettingsScreen() {
+  return (
+    <AntProvider>
+      <SettingsScreenInner />
+    </AntProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.bg, padding: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: palette.white,
-    borderWidth: 1, borderColor: palette.border, borderRadius: 10, padding: 14, marginBottom: 10 },
-  disabled: { opacity: 0.6 },
-  rowText: { flex: 1, fontSize: 15, color: palette.text },
-  chevron: { fontSize: 20, color: palette.gray },
-  version: { fontSize: 12, color: palette.subtext, textAlign: 'center', marginTop: 16 },
+  container: { flex: 1, backgroundColor: palette.bg },
+  actions: { padding: 16 },
+  soon: { fontSize: 12, color: palette.subtext },
+  disabledText: { color: palette.subtext },
+  version: { fontSize: 12, color: palette.subtext, textAlign: 'center', marginTop: 8 },
 });
