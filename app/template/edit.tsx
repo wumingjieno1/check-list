@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, Pressable, StyleSheet, Alert, Platform,
   ScrollView, Dimensions,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { repo, createAppActions } from '@/stores/useAppStore';
@@ -25,9 +26,7 @@ export default function TemplateEditScreen() {
   const editing = checklistId ? repo.checklists.get(checklistId) : null;
   const actions = useMemo(() => createAppActions(repo), []);
 
-  const scrollRef = useRef<ScrollView>(null);
-  const pendingFocusItem = useRef<string | null>(null);
-  const inputRefs = useRef(new Map<string, TextInput>());
+  const scrollRef = useRef<any>(null);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -46,19 +45,17 @@ export default function TemplateEditScreen() {
     setGroups((gs) => gs.map((g) => (g.localId === localId ? { ...g, ...patch } : g))), []);
 
   const scrollToEndSoon = useCallback(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 220);
+    setTimeout(() => scrollRef.current?.scrollToEnd?.({ animated: true }), 120);
+    setTimeout(() => scrollRef.current?.scrollToEnd?.({ animated: true }), 320);
   }, []);
 
   const addItem = useCallback((groupLocalId: string) => {
     const newId = uuid();
-    pendingFocusItem.current = newId;
     setGroups((gs) => gs.map((g) =>
       g.localId === groupLocalId
         ? { ...g, items: [...g.items, { localId: newId, title: '' }] }
         : g));
-    scrollToEndSoon();
-  }, [scrollToEndSoon]);
+  }, []);
 
   const updateItem = useCallback((groupLocalId: string, itemLocalId: string, title: string) =>
     setGroups((gs) => gs.map((g) =>
@@ -143,28 +140,20 @@ export default function TemplateEditScreen() {
     ]);
   };
 
-  useEffect(() => {
-    const id = pendingFocusItem.current;
-    if (!id || !inputRefs.current.has(id)) return;
-    pendingFocusItem.current = null;
-    const node = inputRefs.current.get(id);
-    setTimeout(() => node?.focus(), 120);
-  });
-
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: palette.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
       <Stack.Screen options={{
         headerShown: true, title: editing ? '编辑检查单' : '新建检查单',
         headerRight: () => (
           <Pressable onPress={save} hitSlop={10}><Text style={{ color: palette.blue, fontSize: 16, fontWeight: '600' }}>保存</Text></Pressable>
         ),
       }} />
-      <ScrollView
+      <KeyboardAwareScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={styles.formContent}
+        bottomOffset={24}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
       >
         <TextInput style={styles.input} placeholder="检查单名称" value={title} onChangeText={setTitle} />
 
@@ -209,10 +198,6 @@ export default function TemplateEditScreen() {
               {g.items.map((it, ii) => (
                 <View key={it.localId} style={styles.itemRow}>
                   <TextInput
-                    ref={(r) => {
-                      if (r) inputRefs.current.set(it.localId, r);
-                      else inputRefs.current.delete(it.localId);
-                    }}
                     style={styles.itemInput}
                     placeholder="检查项"
                     value={it.title}
@@ -237,15 +222,21 @@ export default function TemplateEditScreen() {
           </View>
         ))}
 
-        <Pressable onPress={() => { setGroups((gs) => [...gs, { localId: uuid(), title: `分组 ${gs.length + 1}`, items: [] }]); scrollToEndSoon(); }} style={styles.addGroup}>
+        <Pressable
+          onPress={() => {
+            setGroups((gs) => [...gs, { localId: uuid(), title: `分组 ${gs.length + 1}`, items: [] }]);
+            scrollToEndSoon();
+          }}
+          style={styles.addGroup}
+        >
           <Text style={styles.addGroupText}>＋ 添加分组</Text>
         </Pressable>
 
         <Pressable onPress={confirmDelete} style={styles.deleteBtn}>
           <Text style={styles.deleteText}>{editing ? '删除检查单' : '取消'}</Text>
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }
 

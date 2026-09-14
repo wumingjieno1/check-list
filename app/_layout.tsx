@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, AppState, LogBox, Platform, type AppStateStatus } from 'react-native';
+import { View, Text, ActivityIndicator, AppState, Platform, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useAppStore } from '@/stores/useAppStore';
 import { palette } from '@/theme/colors';
-
-LogBox.ignoreLogs([
-  'ref.measureLayout must be called with a ref to a native component',
-  'InteractionManager has been deprecated',
-]);
 
 export default function RootLayout() {
   const hydrate = useAppStore((s) => s.hydrate);
@@ -52,18 +48,20 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="checklist/[id]" options={{ presentation: 'card', headerShown: true, title: '' }} />
-        <Stack.Screen
-          name="template/edit"
-          options={{
-            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
-            headerShown: false,
-          }}
-        />
-      </Stack>
+      <KeyboardProvider statusBarTranslucent navigationBarTranslucent={false}>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="checklist/[id]" options={{ presentation: 'card', headerShown: true, title: '' }} />
+          <Stack.Screen
+            name="template/edit"
+            options={{
+              presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+              headerShown: false,
+            }}
+          />
+        </Stack>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }
