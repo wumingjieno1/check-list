@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet, Alert, Keyboard,
-  ScrollView, Dimensions,
+  View, Text, TextInput, Pressable, StyleSheet, Alert,
+  ScrollView,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,11 +15,9 @@ import type { RecurrenceType } from '@/repositories/types';
 
 const ICON_OPTIONS = ['checkmark-circle-outline', 'heart-outline', 'car-outline', 'home-outline', 'briefcase-outline', 'fitness-outline'];
 const COLOR_OPTIONS = Object.keys(checklistColors);
-const WINDOW_H = Dimensions.get('window').height;
-const HEADER_RESERVED = 110;
 const GROUP_TOP_GAP = 12;
-const IDLE_ITEM_LIST_MAX = WINDOW_H * 0.45;
 const ITEM_ROW_H = 44;
+const ITEM_VISIBLE_ROWS = 6;
 
 interface LocalItem { localId: string; title: string; dbId?: string }
 interface LocalGroup { localId: string; title: string; dbId?: string; items: LocalItem[] }
@@ -36,7 +34,6 @@ export default function TemplateEditScreen() {
   const inputRefs = useRef<Map<string, any>>(new Map());
   const pendingFocusItem = useRef<string | null>(null);
   const focusedGroup = useRef<string | null>(null);
-  const [keyboardH, setKeyboardH] = useState(0);
 
   const bringGroupToTop = useCallback((groupLocalId: string) => {
     const top = groupTops.current.get(groupLocalId);
@@ -50,21 +47,8 @@ export default function TemplateEditScreen() {
     setTimeout(() => bringGroupToTop(groupLocalId), 220);
   }, [bringGroupToTop]);
 
-  const itemListMax = keyboardH > 0
-    ? Math.max(ITEM_ROW_H * 2, WINDOW_H - keyboardH - HEADER_RESERVED)
-    : IDLE_ITEM_LIST_MAX;
-
   const itemListHeight = (itemCount: number) =>
-    Math.min(itemListMax, Math.max(0, itemCount * ITEM_ROW_H));
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardH(e.endCoordinates.height);
-      if (focusedGroup.current) setTimeout(() => bringGroupToTop(focusedGroup.current!), 0);
-    });
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardH(0));
-    return () => { show.remove(); hide.remove(); };
-  }, [bringGroupToTop]);
+    Math.min(ITEM_VISIBLE_ROWS, itemCount) * ITEM_ROW_H;
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -259,8 +243,7 @@ export default function TemplateEditScreen() {
                 if (r) innerScrollRefs.current.set(g.localId, r);
                 else innerScrollRefs.current.delete(g.localId);
               }}
-              style={{ height: itemListHeight(g.items.length) }}
-              contentContainerStyle={styles.itemList}
+              style={{ height: itemListHeight(g.items.length) }}              contentContainerStyle={styles.itemList}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator
