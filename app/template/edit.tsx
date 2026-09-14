@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet, Alert, Platform,
+  View, Text, TextInput, Pressable, StyleSheet, Alert, Keyboard,
   ScrollView, Dimensions,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -15,7 +15,10 @@ import type { RecurrenceType } from '@/repositories/types';
 
 const ICON_OPTIONS = ['checkmark-circle-outline', 'heart-outline', 'car-outline', 'home-outline', 'briefcase-outline', 'fitness-outline'];
 const COLOR_OPTIONS = Object.keys(checklistColors);
-const ITEM_LIST_MAX = Dimensions.get('window').height * 0.45;
+const WINDOW_H = Dimensions.get('window').height;
+const HEADER_RESERVED = 110;
+const GROUP_TOP_GAP = 12;
+const IDLE_ITEM_LIST_MAX = WINDOW_H * 0.45;
 
 interface LocalItem { localId: string; title: string; dbId?: string }
 interface LocalGroup { localId: string; title: string; dbId?: string; items: LocalItem[] }
@@ -27,6 +30,37 @@ export default function TemplateEditScreen() {
   const actions = useMemo(() => createAppActions(repo), []);
 
   const scrollRef = useRef<any>(null);
+  const groupTops = useRef<Map<string, number>>(new Map());
+  const innerScrollRefs = useRef<Map<string, any>>(new Map());
+  const inputRefs = useRef<Map<string, any>>(new Map());
+  const pendingFocusItem = useRef<string | null>(null);
+  const focusedGroup = useRef<string | null>(null);
+  const [keyboardH, setKeyboardH] = useState(0);
+
+  const bringGroupToTop = useCallback((groupLocalId: string) => {
+    const top = groupTops.current.get(groupLocalId);
+    if (top == null) return;
+    scrollRef.current?.scrollTo?.({ y: Math.max(0, top - GROUP_TOP_GAP), animated: true });
+  }, []);
+
+  const onGroupFocus = useCallback((groupLocalId: string) => {
+    focusedGroup.current = groupLocalId;
+    setTimeout(() => bringGroupToTop(groupLocalId), 0);
+    setTimeout(() => bringGroupToTop(groupLocalId), 220);
+  }, [bringGroupToTop]);
+
+  const itemListMax = keyboardH > 0
+    ? Math.max(120, WINDOW_H - keyboardH - HEADER_RESERVED)
+    : IDLE_ITEM_LIST_MAX;
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardH(e.endCoordinates.height);
+      if (focusedGroup.current) setTimeout(() => bringGroupToTop(focusedGroup.current!), 0);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardH(0));
+    return () => { show.remove(); hide.remove(); };
+  }, [bringGroupToTop]);
 
   const [title, setTitle] = useState(editing?.title ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? ICON_OPTIONS[0]);
@@ -51,11 +85,24 @@ export default function TemplateEditScreen() {
 
   const addItem = useCallback((groupLocalId: string) => {
     const newId = uuid();
+    pendingFocusItem.current = newId;
+    focusedGroup.current = groupLocalId;
     setGroups((gs) => gs.map((g) =>
       g.localId === groupLocalId
         ? { ...g, items: [...g.items, { localId: newId, title: '' }] }
         : g));
-  }, []);
+    setTimeout(() => bringGroupToTop(groupLocalId), 0);
+    setTimeout(() => innerScrollRefs.current.get(groupLocalId)?.scrollToEnd?.({ animated: true }), 160);
+    setTimeout(() => innerScrollRefs.current.get(groupLocalId)?.scrollToEnd?.({ animated: true }), 320);
+  }, [bringGroupToTop]);
+
+  useEffect(() => {
+    const id = pendingFocusItem.current;
+    if (!id || !inputRefs.current.has(id)) return;
+    pendingFocusItem.current = null;
+    const node = inputRefs.current.get(id);
+    setTimeout(() => node?.focus?.(), 200);
+  });
 
   const updateItem = useCallback((groupLocalId: string, itemLocalId: string, title: string) =>
     setGroups((gs) => gs.map((g) =>
@@ -155,7 +202,13 @@ export default function TemplateEditScreen() {
         bottomOffset={24}
         keyboardShouldPersistTaps="handled"
       >
-        <TextInput style={styles.input} placeholder="检查单名称" value={title} onChangeText={setTitle} />
+        <TextInput
+          style={styles.input}
+          placeholder="检查单名称"
+          value={title}
+          onChangeText={setTitle}
+          onFocus={() => { focusedGroup.current = null; }}
+        />
 
         <View style={styles.row}>
           {ICON_OPTIONS.map((name) => (
@@ -174,9 +227,18 @@ export default function TemplateEditScreen() {
         <RepeaterEditor recurrence={recurrence} weekdays={weekdays} onChange={(r, w) => { setRecurrence(r); setWeekdays(w); }} />
 
         {groups.map((g, gi) => (
-          <View key={g.localId} style={styles.groupCard}>
+          <View
+            key={g.localId}
+            style={styles.groupCard}
+            onLayout={(e) => groupTops.current.set(g.localId, e.nativeEvent.layout.y)}
+          >
             <View style={styles.groupHeader}>
-              <TextInput style={styles.groupTitle} value={g.title} onChangeText={(t) => updateGroup(g.localId, { title: t })} />
+              <TextInput
+                style={styles.groupTitle}
+                value={g.title}
+                onChangeText={(t) => updateGroup(g.localId, { title: t })}
+                onFocus={() => onGroupFocus(g.localId)}
+              />
               <Pressable hitSlop={8} disabled={gi === 0} onPress={() => moveGroup(gi, -1)}>
                 <Ionicons name="chevron-up" size={18} color={gi === 0 ? '#C7C7CC' : palette.gray} />
               </Pressable>
@@ -189,7 +251,11 @@ export default function TemplateEditScreen() {
             </View>
 
             <ScrollView
-              style={{ maxHeight: ITEM_LIST_MAX }}
+              ref={(r) => {
+                if (r) innerScrollRefs.current.set(g.localId, r);
+                else innerScrollRefs.current.delete(g.localId);
+              }}
+              style={{ maxHeight: itemListMax }}
               contentContainerStyle={styles.itemList}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
@@ -198,10 +264,15 @@ export default function TemplateEditScreen() {
               {g.items.map((it, ii) => (
                 <View key={it.localId} style={styles.itemRow}>
                   <TextInput
+                    ref={(r) => {
+                      if (r) inputRefs.current.set(it.localId, r);
+                      else inputRefs.current.delete(it.localId);
+                    }}
                     style={styles.itemInput}
                     placeholder="检查项"
                     value={it.title}
                     onChangeText={(t) => updateItem(g.localId, it.localId, t)}
+                    onFocus={() => onGroupFocus(g.localId)}
                   />
                   <Pressable hitSlop={8} disabled={ii === 0} onPress={() => moveItem(g.localId, it.localId, -1)}>
                     <Ionicons name="chevron-up" size={18} color={ii === 0 ? '#C7C7CC' : palette.gray} />
