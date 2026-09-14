@@ -10,7 +10,7 @@ module.exports = {
     pattern.includes('standard-navigation')
       ? pattern.replace(
           'standard-navigation',
-          'standard-navigation|react-native-worklets|drizzle-orm'
+          'standard-navigation|drizzle-orm'
         )
       : pattern
   ),
