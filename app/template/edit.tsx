@@ -19,6 +19,7 @@ const WINDOW_H = Dimensions.get('window').height;
 const HEADER_RESERVED = 110;
 const GROUP_TOP_GAP = 12;
 const IDLE_ITEM_LIST_MAX = WINDOW_H * 0.45;
+const ITEM_ROW_H = 44;
 
 interface LocalItem { localId: string; title: string; dbId?: string }
 interface LocalGroup { localId: string; title: string; dbId?: string; items: LocalItem[] }
@@ -50,8 +51,11 @@ export default function TemplateEditScreen() {
   }, [bringGroupToTop]);
 
   const itemListMax = keyboardH > 0
-    ? Math.max(120, WINDOW_H - keyboardH - HEADER_RESERVED)
+    ? Math.max(ITEM_ROW_H * 2, WINDOW_H - keyboardH - HEADER_RESERVED)
     : IDLE_ITEM_LIST_MAX;
+
+  const itemListHeight = (itemCount: number) =>
+    Math.min(itemListMax, Math.max(0, itemCount * ITEM_ROW_H));
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', (e) => {
@@ -255,7 +259,7 @@ export default function TemplateEditScreen() {
                 if (r) innerScrollRefs.current.set(g.localId, r);
                 else innerScrollRefs.current.delete(g.localId);
               }}
-              style={{ maxHeight: itemListMax }}
+              style={{ height: itemListHeight(g.items.length) }}
               contentContainerStyle={styles.itemList}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
