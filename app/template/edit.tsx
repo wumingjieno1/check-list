@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
-  ScrollView,
+  ScrollView, Dimensions,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import type { RecurrenceType } from '@/repositories/types';
 
 const ICON_OPTIONS = ['checkmark-circle-outline', 'heart-outline', 'car-outline', 'home-outline', 'briefcase-outline', 'fitness-outline'];
 const COLOR_OPTIONS = Object.keys(checklistColors);
+const ITEM_LIST_MAX = Dimensions.get('window').height * 0.45;
 
 interface LocalItem { localId: string; title: string; dbId?: string }
 interface LocalGroup { localId: string; title: string; dbId?: string; items: LocalItem[] }
@@ -198,29 +199,37 @@ export default function TemplateEditScreen() {
               </Pressable>
             </View>
 
-            {g.items.map((it, ii) => (
-              <View key={it.localId} style={styles.itemRow}>
-                <TextInput
-                  ref={(r) => {
-                    if (r) inputRefs.current.set(it.localId, r);
-                    else inputRefs.current.delete(it.localId);
-                  }}
-                  style={styles.itemInput}
-                  placeholder="检查项"
-                  value={it.title}
-                  onChangeText={(t) => updateItem(g.localId, it.localId, t)}
-                />
-                <Pressable hitSlop={8} disabled={ii === 0} onPress={() => moveItem(g.localId, it.localId, -1)}>
-                  <Ionicons name="chevron-up" size={18} color={ii === 0 ? '#C7C7CC' : palette.gray} />
-                </Pressable>
-                <Pressable hitSlop={8} disabled={ii === g.items.length - 1} onPress={() => moveItem(g.localId, it.localId, 1)}>
-                  <Ionicons name="chevron-down" size={18} color={ii === g.items.length - 1 ? '#C7C7CC' : palette.gray} />
-                </Pressable>
-                <Pressable hitSlop={8} onPress={() => removeItem(g.localId, it.localId)}>
-                  <Ionicons name="close-circle-outline" size={18} color={palette.gray} />
-                </Pressable>
-              </View>
-            ))}
+            <ScrollView
+              style={{ maxHeight: ITEM_LIST_MAX }}
+              contentContainerStyle={styles.itemList}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
+              {g.items.map((it, ii) => (
+                <View key={it.localId} style={styles.itemRow}>
+                  <TextInput
+                    ref={(r) => {
+                      if (r) inputRefs.current.set(it.localId, r);
+                      else inputRefs.current.delete(it.localId);
+                    }}
+                    style={styles.itemInput}
+                    placeholder="检查项"
+                    value={it.title}
+                    onChangeText={(t) => updateItem(g.localId, it.localId, t)}
+                  />
+                  <Pressable hitSlop={8} disabled={ii === 0} onPress={() => moveItem(g.localId, it.localId, -1)}>
+                    <Ionicons name="chevron-up" size={18} color={ii === 0 ? '#C7C7CC' : palette.gray} />
+                  </Pressable>
+                  <Pressable hitSlop={8} disabled={ii === g.items.length - 1} onPress={() => moveItem(g.localId, it.localId, 1)}>
+                    <Ionicons name="chevron-down" size={18} color={ii === g.items.length - 1 ? '#C7C7CC' : palette.gray} />
+                  </Pressable>
+                  <Pressable hitSlop={8} onPress={() => removeItem(g.localId, it.localId)}>
+                    <Ionicons name="close-circle-outline" size={18} color={palette.gray} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
             <Pressable onPress={() => addItem(g.localId)} style={styles.addItem}>
               <Ionicons name="add" size={16} color={palette.blue} />
               <Text style={styles.addItemText}>添加检查项</Text>
@@ -253,6 +262,7 @@ const styles = StyleSheet.create({
     padding: 12, marginTop: 14 },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   groupTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: palette.text, paddingVertical: 4 },
+  itemList: { paddingBottom: 4 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, minHeight: 44,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.lightGray },
   itemInput: { flex: 1, fontSize: 15, color: palette.text, paddingVertical: 4 },
