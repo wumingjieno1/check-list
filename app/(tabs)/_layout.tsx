@@ -19,7 +19,7 @@ export default function TabLayout() {
         tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
       }} />
       <Tabs.Screen name="templates" options={{
-        title: '模板',
+        title: '检查单',
         tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" color={color} size={size} />,
       }} />
       <Tabs.Screen name="settings" options={{
