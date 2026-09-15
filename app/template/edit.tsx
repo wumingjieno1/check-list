@@ -17,7 +17,7 @@ const ICON_OPTIONS = ['checkmark-circle-outline', 'heart-outline', 'car-outline'
 const COLOR_OPTIONS = Object.keys(checklistColors);
 const GROUP_TOP_GAP = 12;
 const ITEM_ROW_H = 44;
-const ITEM_VISIBLE_ROWS = 6;
+const ITEM_VISIBLE_ROWS = 4;
 
 interface LocalItem { localId: string; title: string; dbId?: string }
 interface LocalGroup { localId: string; title: string; dbId?: string; items: LocalItem[] }
