@@ -6,8 +6,21 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "ios": { "supportsTablet": true },
-    "android": { "package": "com.local.checklist" },
-    "plugins": ["expo-router"]
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.local.checklist"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9d392e89-0205-447b-ae85-2126fce50594"
+      }
+    },
+    "owner": "wumingjie"
   }
 }
