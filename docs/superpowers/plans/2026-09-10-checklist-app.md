@@ -62,8 +62,8 @@ vitest.config.ts  jest.config.js  jest.setup.ts  drizzle.config.ts
 - [ ] **Step 1: 在临时位置生成 Expo 模板再搬入仓库**
 
 ```bash
-npx create-expo-app@latest /var/folders/y7/n_3jbvnx2hbcb65gtf5zp6p00000gn/T/opencode/checklist-scaffold --template blank-typescript
-cp -R /var/folders/y7/n_3jbvnx2hbcb65gtf5zp6p00000gn/T/opencode/checklist-scaffold/. /Users/wumingjie/code/check-list/
+npx create-expo-app@latest <tmp-dir>/checklist-scaffold --template blank-typescript
+cp -R <tmp-dir>/checklist-scaffold/. <repo-root>/
 ```
 
 - [ ] **Step 2: 安装依赖**

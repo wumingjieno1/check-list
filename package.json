@@ -1,6 +1,7 @@
 {
   "name": "check-list",
   "version": "0.1.0",
+  "license": "MIT",
   "main": "expo-router/entry",
   "dependencies": {
     "@ant-design/icons-react-native": "^2.3.2",

@@ -24,3 +24,6 @@ npm-debug.*
 
 # macOS / secrets
 *.pem
+.env
+.env.*
+!.env.example
